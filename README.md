@@ -195,7 +195,9 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details
+
+Copyright (c) 2026 andicoder
 
 ## Author
 
