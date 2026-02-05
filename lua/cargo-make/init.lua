@@ -57,26 +57,38 @@ function M.run_task_with_terminal(task_name, cmd, root)
   local current_win = vim.api.nvim_get_current_win()
 
   local term_win = M._term_win
-  local reuse_window = false
+  local term_buf
+  local can_reuse = false
 
   -- Check if we can reuse existing terminal window
   if term_win and vim.api.nvim_win_is_valid(term_win) then
-    -- Window exists, reuse it with a new buffer
-    reuse_window = true
-    vim.api.nvim_set_current_win(term_win)
-
-    -- Delete old buffer if it exists
-    if M._term_buf and vim.api.nvim_buf_is_valid(M._term_buf) then
-      pcall(function()
+    -- Try to reuse the window
+    local ok = pcall(function()
+      -- Delete old buffer if it exists
+      if M._term_buf and vim.api.nvim_buf_is_valid(M._term_buf) then
         vim.api.nvim_buf_delete(M._term_buf, { force = true })
-      end)
-    end
+      end
 
-    -- Create new buffer in the existing window
-    vim.cmd('enew')
-    local term_buf = vim.api.nvim_get_current_buf()
-    M._term_buf = term_buf
-  else
+      -- Create new buffer without switching to the window
+      term_buf = vim.api.nvim_create_buf(false, true)
+      M._term_buf = term_buf
+
+      -- Set the new buffer in the existing window
+      vim.api.nvim_win_set_buf(term_win, term_buf)
+
+      -- Now switch to that window to run termopen
+      vim.api.nvim_set_current_win(term_win)
+    end)
+
+    if ok then
+      can_reuse = true
+    else
+      -- Window became invalid, need to create new one
+      M._term_win = nil
+    end
+  end
+
+  if not can_reuse then
     -- Create new window and buffer
     local split_cmd = M.config.output_position == 'bottom' and 'botright'
       or M.config.output_position == 'top' and 'topleft'
@@ -85,14 +97,12 @@ function M.run_task_with_terminal(task_name, cmd, root)
       or 'botright'
 
     vim.cmd(string.format('%s %dnew', split_cmd, M.config.output_height))
-    local term_buf = vim.api.nvim_get_current_buf()
+    term_buf = vim.api.nvim_get_current_buf()
     term_win = vim.api.nvim_get_current_win()
 
     M._term_buf = term_buf
     M._term_win = term_win
   end
-
-  local term_buf = M._term_buf
 
   -- Set buffer options
   vim.api.nvim_buf_set_option(term_buf, 'bufhidden', 'wipe')
@@ -129,9 +139,6 @@ function M.run_task_with_terminal(task_name, cmd, root)
 
   if job_id <= 0 then
     vim.notify('Failed to start cargo-make', vim.log.levels.ERROR)
-    if not reuse_window then
-      vim.api.nvim_win_close(term_win, true)
-    end
     return
   end
 
@@ -231,9 +238,6 @@ function M.run_task_silent(task_name, cmd, root)
       end
     end,
     on_exit = function(_, exit_code)
-      -- Parse output and populate quickfix
-      quickfix.populate_from_output(output, root)
-
       if exit_code == 0 then
         vim.notify(string.format('Task "%s" completed successfully', task_name), vim.log.levels.INFO)
       else
