@@ -1,6 +1,17 @@
 # nvim-cargo-make
 
-A Neovim plugin for seamless integration with [cargo-make](https://github.com/sagiegurari/cargo-make), the Rust task runner and build tool.
+> A lightweight Neovim plugin for seamless [cargo-make](https://github.com/sagiegurari/cargo-make) integration with real-time terminal output and smart window management.
+
+Execute cargo-make tasks directly from Neovim with live output streaming, intelligent terminal reuse, and adaptive auto-scrolling. Built for Rust developers who want their build tools to stay out of the way.
+
+## Why nvim-cargo-make?
+
+- ⚡ **Real-time feedback** - See build output as it happens
+- 🔄 **Smart terminal reuse** - One window for all tasks, automatically cleared between builds
+- 📜 **Adaptive scrolling** - Auto-follows output, pauses when you scroll up to investigate
+- ⌨️  **Tab completion** - Quickly find and run tasks
+- 🎯 **Zero config** - Works out of the box, configure if you want
+- 🚀 **Non-blocking** - Async execution never freezes your editor
 
 ## Features
 
