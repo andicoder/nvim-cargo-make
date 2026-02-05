@@ -6,10 +6,10 @@ A Neovim plugin for seamless integration with [cargo-make](https://github.com/sa
 
 - ✅ Execute cargo-make tasks directly from Neovim
 - ✅ **Real-time build output** in terminal split
+- ✅ **Smart terminal reuse** - clears and reuses the same window for multiple builds
+- ✅ **Smart auto-scrolling** - follows output while allowing free navigation
 - ✅ Tab completion for task names
 - ✅ Asynchronous task execution (non-blocking)
-- ✅ Automatic error parsing and quickfix integration
-- ✅ Jump to errors directly from quickfix window
 - ✅ Interactive task selection with descriptions
 - ✅ Supports all cargo-make tasks and custom Makefile.toml configurations
 - ✅ Configurable output display (terminal or silent mode)
@@ -67,15 +67,14 @@ Plug 'andicoder/nvim-cargo-make'
   - Shows all available tasks with descriptions
   - Select a task to run
 
-### Quickfix Integration
+### Terminal Navigation
 
-After running a task:
-- Errors and warnings are automatically parsed
-- Quickfix window opens if there are errors
-- Navigate through errors with:
-  - `:cnext` / `:cprev` - Next/previous error
-  - `:cfirst` / `:clast` - First/last error
-  - `Enter` on a quickfix entry to jump to the location
+In the terminal output window:
+- Navigate freely with vim motions (`j`/`k`, `gg`/`G`, etc.)
+- Search with `/pattern` and navigate with `n`/`N`
+- Scroll up to read earlier output (auto-scroll pauses)
+- Scroll back to bottom to resume auto-scroll
+- Press `q` or `<Esc>` to close the terminal window
 
 ### Example Workflows
 
@@ -83,11 +82,18 @@ After running a task:
 ```vim
 :CargoMake build         " Build the project (shows output in terminal split)
 " Watch the build progress in real-time!
-" Press 'q' or <Esc> in the terminal window to close it
+" Terminal auto-scrolls to show latest output
+" Navigate freely - scroll up to read earlier output
+" Auto-scroll pauses when you scroll up, resumes when near bottom
 
-:copen                   " Open quickfix window (auto-opens on errors)
-:cnext                   " Jump to next error
-:cprev                   " Jump to previous error
+:CargoMake test          " Run another task - reuses the same terminal window!
+" Terminal is automatically cleared before each build
+
+" Navigate in the terminal:
+" j/k - scroll up/down
+" gg/G - jump to top/bottom
+" /pattern - search for text
+" q or <Esc> - close terminal
 ```
 
 **Silent mode (background execution):**
@@ -146,10 +152,16 @@ vim.keymap.set('n', '[q', ':cprev<CR>', { desc = 'Previous quickfix item' })
 
 1. **Task Discovery**: The plugin searches for `Makefile.toml` in the current directory and parent directories
 2. **Task Listing**: Uses `cargo make --list-all-steps` to enumerate all available tasks with descriptions
-3. **Async Execution**: Runs tasks asynchronously using Neovim's `jobstart()` for non-blocking operation
-4. **Error Parsing**: Captures stdout/stderr and parses Rust compiler error format (`error[E0xxx]`, file locations, etc.)
-5. **Quickfix Integration**: Populates the quickfix list with parsed errors including file:line:col information
-6. **Auto-open**: Automatically opens the quickfix window when errors are detected
+3. **Async Execution**: Runs tasks asynchronously using Neovim's terminal for non-blocking operation
+4. **Terminal Output**: Shows real-time output in a terminal split with smart auto-scrolling
+   - Auto-scrolls to bottom when you're viewing the end of output
+   - Pauses auto-scroll when you scroll up to read earlier output
+   - Resumes when you scroll back near the bottom
+5. **Terminal Reuse**: Automatically reuses the same terminal window for multiple builds
+   - Creates a fresh buffer in the same window position
+   - Updates the window title to show current task
+   - No more terminal window clutter!
+6. **Smart Notifications**: Shows completion message with success/failure status
 
 ## Troubleshooting
 

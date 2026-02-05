@@ -1,7 +1,7 @@
 local M = {}
 
 local tasks = require('cargo-make.tasks')
-local quickfix = require('cargo-make.quickfix')
+-- local quickfix = require('cargo-make.quickfix')  -- Disabled for now
 
 -- Configuration
 M.config = {
@@ -9,6 +9,11 @@ M.config = {
   output_height = 15,  -- Height of the output window
   output_position = 'bottom',  -- 'bottom', 'top', 'left', 'right'
 }
+
+-- Store terminal buffer and window for reuse
+M._term_buf = nil
+M._term_win = nil
+M._scroll_timer = nil
 
 -- Setup function for user configuration
 function M.setup(opts)
@@ -51,48 +56,66 @@ function M.run_task_with_terminal(task_name, cmd, root)
   -- Save the current window
   local current_win = vim.api.nvim_get_current_win()
 
-  -- Create a new split for the terminal
-  local split_cmd = M.config.output_position == 'bottom' and 'botright'
-    or M.config.output_position == 'top' and 'topleft'
-    or M.config.output_position == 'left' and 'topleft vertical'
-    or M.config.output_position == 'right' and 'botright vertical'
-    or 'botright'
+  local term_win = M._term_win
+  local reuse_window = false
 
-  vim.cmd(string.format('%s %dnew', split_cmd, M.config.output_height))
-  local term_buf = vim.api.nvim_get_current_buf()
-  local term_win = vim.api.nvim_get_current_win()
+  -- Check if we can reuse existing terminal window
+  if term_win and vim.api.nvim_win_is_valid(term_win) then
+    -- Window exists, reuse it with a new buffer
+    reuse_window = true
+    vim.api.nvim_set_current_win(term_win)
+
+    -- Delete old buffer if it exists
+    if M._term_buf and vim.api.nvim_buf_is_valid(M._term_buf) then
+      pcall(function()
+        vim.api.nvim_buf_delete(M._term_buf, { force = true })
+      end)
+    end
+
+    -- Create new buffer in the existing window
+    vim.cmd('enew')
+    local term_buf = vim.api.nvim_get_current_buf()
+    M._term_buf = term_buf
+  else
+    -- Create new window and buffer
+    local split_cmd = M.config.output_position == 'bottom' and 'botright'
+      or M.config.output_position == 'top' and 'topleft'
+      or M.config.output_position == 'left' and 'topleft vertical'
+      or M.config.output_position == 'right' and 'botright vertical'
+      or 'botright'
+
+    vim.cmd(string.format('%s %dnew', split_cmd, M.config.output_height))
+    local term_buf = vim.api.nvim_get_current_buf()
+    term_win = vim.api.nvim_get_current_win()
+
+    M._term_buf = term_buf
+    M._term_win = term_win
+  end
+
+  local term_buf = M._term_buf
+
+  -- Set buffer options
+  vim.api.nvim_buf_set_option(term_buf, 'bufhidden', 'wipe')
+  vim.api.nvim_buf_set_option(term_buf, 'buflisted', false)
+  vim.api.nvim_buf_set_option(term_buf, 'scrollback', 10000)
+
+  -- Set up keymaps for the terminal buffer
+  vim.api.nvim_buf_set_keymap(term_buf, 'n', 'q', ':close<CR>', { noremap = true, silent = true })
+  vim.api.nvim_buf_set_keymap(term_buf, 'n', '<Esc>', ':close<CR>', { noremap = true, silent = true })
 
   -- Set buffer name
-  vim.api.nvim_buf_set_name(term_buf, string.format('[Cargo Make: %s]', task_name))
+  pcall(function()
+    vim.api.nvim_buf_set_name(term_buf, string.format('[Cargo Make: %s]', task_name))
+  end)
 
-  -- Capture output for quickfix
-  local output = {}
-  local temp_file = vim.fn.tempname()
-
-  -- Run command with tee to show output and capture it
-  local full_cmd = string.format('cd %s && %s 2>&1 | tee %s; exit ${PIPESTATUS[0]}',
+  -- Run command directly without quickfix capture
+  local full_cmd = string.format('cd %s && %s 2>&1',
     vim.fn.shellescape(root),
-    cmd,
-    vim.fn.shellescape(temp_file))
+    cmd)
 
   -- Start terminal job
   local job_id = vim.fn.termopen(full_cmd, {
     on_exit = function(_, exit_code)
-      -- Read captured output
-      if vim.fn.filereadable(temp_file) == 1 then
-        local file = io.open(temp_file, 'r')
-        if file then
-          for line in file:lines() do
-            table.insert(output, line)
-          end
-          file:close()
-          vim.fn.delete(temp_file)
-        end
-      end
-
-      -- Parse output and populate quickfix
-      quickfix.populate_from_output(output, root)
-
       -- Show result
       vim.schedule(function()
         if exit_code == 0 then
@@ -100,29 +123,91 @@ function M.run_task_with_terminal(task_name, cmd, root)
         else
           vim.notify(string.format('Task "%s" failed with exit code %d', task_name, exit_code), vim.log.levels.ERROR)
         end
-
-        -- Open quickfix window if there are errors
-        local qf_list = vim.fn.getqflist()
-        if #qf_list > 0 then
-          vim.cmd('copen')
-        end
       end)
     end,
   })
 
   if job_id <= 0 then
     vim.notify('Failed to start cargo-make', vim.log.levels.ERROR)
-    vim.api.nvim_win_close(term_win, true)
+    if not reuse_window then
+      vim.api.nvim_win_close(term_win, true)
+    end
     return
   end
 
-  -- Set buffer options
-  vim.api.nvim_buf_set_option(term_buf, 'bufhidden', 'wipe')
-  vim.api.nvim_buf_set_option(term_buf, 'buflisted', false)
+  -- Stop any existing scroll timer
+  if M._scroll_timer then
+    M._scroll_timer:stop()
+    M._scroll_timer:close()
+    M._scroll_timer = nil
+  end
 
-  -- Set up keymaps for the terminal buffer
-  vim.api.nvim_buf_set_keymap(term_buf, 'n', 'q', ':close<CR>', { noremap = true, silent = true })
-  vim.api.nvim_buf_set_keymap(term_buf, 'n', '<Esc>', ':close<CR>', { noremap = true, silent = true })
+  -- Auto-scroll terminal to bottom as output comes in
+  local augroup = vim.api.nvim_create_augroup('CargoMakeTerminal_' .. term_buf, { clear = true })
+  vim.api.nvim_create_autocmd({'TermOpen', 'TermEnter'}, {
+    group = augroup,
+    buffer = term_buf,
+    callback = function()
+      vim.cmd('startinsert')
+      if vim.api.nvim_win_is_valid(term_win) then
+        pcall(function()
+          vim.api.nvim_win_set_cursor(term_win, {vim.api.nvim_buf_line_count(term_buf), 0})
+        end)
+      end
+    end,
+  })
+
+  -- Scroll to bottom periodically while job is running
+  -- Only auto-scroll if user hasn't manually scrolled up
+  M._scroll_timer = vim.loop.new_timer()
+  M._scroll_timer:start(0, 100, vim.schedule_wrap(function()
+    if vim.api.nvim_buf_is_valid(term_buf) and vim.api.nvim_win_is_valid(term_win) then
+      -- Check if terminal is still running
+      if vim.api.nvim_buf_get_option(term_buf, 'channel') > 0 then
+        pcall(function()
+          local line_count = vim.api.nvim_buf_line_count(term_buf)
+
+          -- Only auto-scroll if:
+          -- 1. User is not currently in the terminal window, OR
+          -- 2. User is in the terminal window and near the bottom (within 3 lines)
+          local current_win = vim.api.nvim_get_current_win()
+          local should_scroll = false
+
+          if current_win ~= term_win then
+            -- User is in a different window, safe to auto-scroll
+            should_scroll = true
+          else
+            -- User is in the terminal window, check if they're near the bottom
+            local cursor = vim.api.nvim_win_get_cursor(term_win)
+            local cursor_line = cursor[1]
+            if line_count - cursor_line <= 3 then
+              -- User is near the bottom, keep scrolling
+              should_scroll = true
+            end
+            -- If user has scrolled up (more than 3 lines from bottom), don't auto-scroll
+          end
+
+          if should_scroll then
+            vim.api.nvim_win_set_cursor(term_win, {line_count, 0})
+          end
+        end)
+      else
+        -- Job finished, stop timer
+        if M._scroll_timer then
+          M._scroll_timer:stop()
+          M._scroll_timer:close()
+          M._scroll_timer = nil
+        end
+      end
+    else
+      -- Buffer or window closed, stop timer
+      if M._scroll_timer then
+        M._scroll_timer:stop()
+        M._scroll_timer:close()
+        M._scroll_timer = nil
+      end
+    end
+  end))
 
   -- Return to the original window
   vim.api.nvim_set_current_win(current_win)
