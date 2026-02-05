@@ -5,12 +5,14 @@ A Neovim plugin for seamless integration with [cargo-make](https://github.com/sa
 ## Features
 
 - ✅ Execute cargo-make tasks directly from Neovim
+- ✅ **Real-time build output** in terminal split
 - ✅ Tab completion for task names
 - ✅ Asynchronous task execution (non-blocking)
 - ✅ Automatic error parsing and quickfix integration
 - ✅ Jump to errors directly from quickfix window
 - ✅ Interactive task selection with descriptions
 - ✅ Supports all cargo-make tasks and custom Makefile.toml configurations
+- ✅ Configurable output display (terminal or silent mode)
 
 ## Requirements
 
@@ -52,9 +54,14 @@ Plug 'andicoder/nvim-cargo-make'
 
 ### Commands
 
-- `:CargoMake <task-name>` - Run a specific cargo-make task
+- `:CargoMake <task-name>` - Run a specific cargo-make task with terminal output
   - Supports tab completion for task names
+  - Shows real-time build output in a terminal split
   - Example: `:CargoMake build`
+
+- `:CargoMakeSilent <task-name>` - Run a task without terminal output
+  - Runs in background, only shows quickfix on completion
+  - Useful for quick checks or scripts
 
 - `:CargoMakeList` - Open an interactive task selector
   - Shows all available tasks with descriptions
@@ -72,12 +79,21 @@ After running a task:
 
 ### Example Workflows
 
-**Quick build and error navigation:**
+**Quick build with real-time output:**
 ```vim
-:CargoMake build         " Build the project
+:CargoMake build         " Build the project (shows output in terminal split)
+" Watch the build progress in real-time!
+" Press 'q' or <Esc> in the terminal window to close it
+
 :copen                   " Open quickfix window (auto-opens on errors)
 :cnext                   " Jump to next error
 :cprev                   " Jump to previous error
+```
+
+**Silent mode (background execution):**
+```vim
+:CargoMakeSilent check   " Run check without terminal output
+" Only get a notification when done
 ```
 
 **Interactive task selection:**
@@ -93,6 +109,18 @@ After running a task:
 ```
 
 ## Configuration
+
+### Plugin Setup (Optional)
+
+You can configure the plugin behavior in your Neovim config:
+
+```lua
+require('cargo-make').setup({
+  show_output = true,        -- Show output in terminal split (default: true)
+  output_height = 15,        -- Height of output window (default: 15)
+  output_position = 'bottom' -- Position: 'bottom', 'top', 'left', 'right' (default: 'bottom')
+})
+```
 
 ### Recommended Keymaps
 
