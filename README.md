@@ -71,7 +71,7 @@ Plug 'andicoder/nvim-cargo-make'
   - Example: `:CargoMake build`
 
 - `:CargoMakeSilent <task-name>` - Run a task without terminal output
-  - Runs in background, only shows quickfix on completion
+  - Runs in background, only shows notifications on completion
   - Useful for quick checks or scripts
 
 - `:CargoMakeList` - Open an interactive task selector
@@ -152,11 +152,9 @@ vim.keymap.set('n', '<leader>mr', ':CargoMake run<CR>', { desc = 'Cargo Make: Ru
 vim.keymap.set('n', '<leader>mf', ':CargoMake fmt<CR>', { desc = 'Cargo Make: Format' })
 vim.keymap.set('n', '<leader>ml', ':CargoMakeList<CR>', { desc = 'Cargo Make: List tasks' })
 
--- Quickfix navigation
-vim.keymap.set('n', '<leader>qo', ':copen<CR>', { desc = 'Open quickfix' })
-vim.keymap.set('n', '<leader>qc', ':cclose<CR>', { desc = 'Close quickfix' })
-vim.keymap.set('n', ']q', ':cnext<CR>', { desc = 'Next quickfix item' })
-vim.keymap.set('n', '[q', ':cprev<CR>', { desc = 'Previous quickfix item' })
+-- Window navigation
+vim.keymap.set('n', '<C-w>w', '<C-w>w', { desc = 'Switch to next window' })
+vim.keymap.set('n', '<C-w>q', ':q<CR>', { desc = 'Close current window' })
 ```
 
 ## How it Works
@@ -185,9 +183,6 @@ vim.keymap.set('n', '[q', ':cprev<CR>', { desc = 'Previous quickfix item' })
 - Verify cargo-make is installed: `cargo install cargo-make`
 - Check that you're in a directory with a Makefile.toml or its subdirectory
 
-**Quickfix not populating:**
-- The plugin currently parses Rust compiler output format
-- For custom task output, errors must follow standard compiler format
 
 ## Contributing
 
