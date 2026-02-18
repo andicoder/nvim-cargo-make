@@ -1,0 +1,8 @@
+[tasks.build]
+description = "Build the project"
+
+[tasks.test]
+description = "Run tests"
+
+[tasks.lint]
+description = "Lint the code"
