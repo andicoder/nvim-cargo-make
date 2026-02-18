@@ -1,0 +1,8 @@
+[tasks.test]
+description = "Run plugin tests headlessly"
+command = "nvim"
+args = [
+  "--headless",
+  "-u", "spec/minimal_init.lua",
+  "-c", "PlenaryBustedDirectory spec/ {minimal_init = 'spec/minimal_init.lua'}"
+]
