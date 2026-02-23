@@ -4,6 +4,9 @@ M._buf = nil   -- persistent output buffer
 M._win = nil   -- last known window (may have been closed)
 M._job = nil   -- current running job id
 
+local ns          = vim.api.nvim_create_namespace('cargo-make')
+local diagnostics = require('cargo-make.diagnostics')
+
 local function get_split_cmd(position)
   if position == 'top' then return 'topleft'
   elseif position == 'left' then return 'topleft vertical'
@@ -41,6 +44,16 @@ local function append_output(buf, data)
   end
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, lines)
   scroll_to_bottom(buf)
+end
+
+-- Apply vim.diagnostics to the output buffer so the user can navigate with
+-- ]d / [d while in that window. Reads lines directly from the buffer so lnum
+-- indices are always correct.
+local function apply_diagnostics(buf)
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then return end
+  vim.diagnostic.reset(ns, buf)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  vim.diagnostic.set(ns, buf, diagnostics.parse(lines))
 end
 
 -- Return (buf, win), creating the persistent buffer and split on first call.
@@ -98,6 +111,7 @@ function M.run(task_name, cmd, root, config, on_exit)
     on_stderr   = function(_, data) append_output(buf, data) end,
     on_exit     = function(_, exit_code)
       M._job = nil
+      apply_diagnostics(buf)
       if on_exit then on_exit(exit_code) end
     end,
   })
