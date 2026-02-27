@@ -240,4 +240,96 @@ describe('diagnostics.parse()', function()
 
   end)
 
+  -- =========================================================================
+  -- dx / dioxus tool-wrapped output
+  --
+  -- dx prefixes every rustc line with a floating-point timestamp and an
+  -- uppercase log level before forwarding them:
+  --
+  --   "   3.671s  INFO  warning: ..."
+  --   "   5.234s  INFO  error[E0432]: ..."
+  --   "   5.463s  WARN error: could not compile ..."
+  --   "   0.699s ERROR 🚫dx and dioxus versions are incompatible!"
+  --
+  -- All four cases were RED until the timestamp-prefix branch was added.
+  -- =========================================================================
+  describe('dx / dioxus tool-wrapped output', function()
+
+    -- RED → GREEN: dx forwards rustc warnings under INFO
+    it('INFO-wrapped  warning: strips timestamp+level, keeps message', function()
+      local d = first { '   3.671s  INFO  warning: unused import: `std::error::Error`' }
+      assert.are.equal(WARN, d.severity)
+      assert.are.equal('unused import: `std::error::Error`', d.message)
+    end)
+
+    -- RED → GREEN: dx forwards rustc errors under INFO
+    it('INFO-wrapped  error[code]: strips timestamp+level, keeps message', function()
+      local d = first { '   5.234s  INFO  error[E0432]: unresolved import `nwa_data_source::DataSourceActor`' }
+      assert.are.equal(ERROR, d.severity)
+      assert.are.equal('unresolved import `nwa_data_source::DataSourceActor`', d.message)
+    end)
+
+    -- RED → GREEN: cargo error summary forwarded under dx WARN
+    it('WARN-wrapped  error: could not compile  is an error', function()
+      local d = first { '   5.463s  WARN error: could not compile `mypkg` due to previous error' }
+      assert.are.equal(ERROR, d.severity)
+      assert.are.equal('could not compile `mypkg` due to previous error', d.message)
+    end)
+
+    -- RED → GREEN: cargo warning forwarded under dx WARN
+    it('WARN-wrapped  warning: build failed  is a warning', function()
+      local d = first { '   5.463s  WARN warning: build failed, waiting for other jobs to finish...' }
+      assert.are.equal(WARN, d.severity)
+      assert.are.equal('build failed, waiting for other jobs to finish...', d.message)
+    end)
+
+    -- RED → GREEN: dx-level ERROR (no rustc prefix, just a bare message)
+    it('ERROR log-level line captures the message verbatim', function()
+      local d = first { '   0.699s ERROR 🚫dx and dioxus versions are incompatible!' }
+      assert.are.equal(ERROR, d.severity)
+      assert.are.equal('🚫dx and dioxus versions are incompatible!', d.message)
+    end)
+
+    -- GREEN: compilation progress lines must be ignored
+    it('INFO Compiled progress lines are ignored', function()
+      assert.are.same({}, diag.parse {
+        '   1.606s  INFO Compiled [  1/311]: unicode_ident',
+        '  12.916s  INFO Bundling app...',
+      })
+    end)
+
+    -- GREEN: dx WARN lines that are not error/warning prefixed must be ignored
+    it('WARN Caused by: and process detail lines are ignored', function()
+      assert.are.same({}, diag.parse {
+        '   5.463s  WARN Caused by:',
+        "   5.463s  WARN   process didn't exit successfully: `/usr/bin/rustc` (exit status: 1)",
+      })
+    end)
+
+    -- GREEN: cargo-make INFO log lines must be ignored
+    it('[cargo-make] INFO lines are ignored', function()
+      assert.are.same({}, diag.parse {
+        '[cargo-make] INFO - cargo make 0.37.24',
+        '[cargo-make][1] INFO - Project: nwa_dso_bin',
+      })
+    end)
+
+    -- RED → GREEN: correct lnum in mixed dx+rustc output
+    it('lnum is correct across mixed dx-prefixed and raw lines', function()
+      local lines = {
+        '   1.606s  INFO Compiled [  1/311]: unicode_ident',        -- 0 ignored
+        '   3.671s  INFO  warning: unused import: `std::fmt`',      -- 1 → WARN
+        ' --> packages/foo/src/lib.rs:1:5',                          -- 2 ignored
+        '   5.234s  INFO  error[E0432]: unresolved import `Bar`',   -- 3 → ERROR
+      }
+      local r = diag.parse(lines)
+      assert.are.equal(2, #r)
+      assert.are.equal(1, r[1].lnum)
+      assert.are.equal(WARN,  r[1].severity)
+      assert.are.equal(3, r[2].lnum)
+      assert.are.equal(ERROR, r[2].severity)
+    end)
+
+  end)
+
 end)
