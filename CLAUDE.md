@@ -25,11 +25,12 @@ This file is loaded automatically by Claude Code when working in this repo. It c
 
 ```sh
 # Run tests (hot path) — requires plenary.nvim available on the lazy path
-cargo make test
+make test
 
 # Equivalent direct invocation
 nvim --headless -u spec/minimal_init.lua \
-  -c "PlenaryBustedDirectory spec/ {minimal_init = 'spec/minimal_init.lua'}"
+  -c "PlenaryBustedDirectory spec/ {minimal_init = 'spec/minimal_init.lua'}" \
+  -c qa
 
 # Try the plugin against a real Rust project
 nvim path/to/rust/project/src/main.rs

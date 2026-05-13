@@ -209,6 +209,14 @@ vim.keymap.set('n', '<C-w>q', ':q<CR>', { desc = 'Close current window' })
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
 
+Run the test suite with:
+
+```sh
+make test
+```
+
+Requires Neovim with [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) installed (the spec init expects it under `~/.local/share/nvim/lazy/plenary.nvim`).
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details
