@@ -18,7 +18,8 @@ end
 -- Run a cargo-make task
 function M.run_task(task_name, opts)
   opts = opts or {}
-  local show_output = opts.show_output ~= nil and opts.show_output or M.config.show_output
+  local show_output = opts.show_output
+  if show_output == nil then show_output = M.config.show_output end
 
   if not task_name or task_name == '' then
     vim.notify('Please specify a task name', vim.log.levels.ERROR)
@@ -108,6 +109,55 @@ function M.get_task_names()
     table.insert(names, task.name)
   end
   return names
+end
+
+-- Open a Snacks picker showing all errors and warnings from the last build.
+function M.show_errors()
+  local items = terminal.get_items()
+  if not items or #items == 0 then
+    vim.notify('No errors or warnings from last build', vim.log.levels.INFO)
+    return
+  end
+
+  local ERROR = vim.diagnostic.severity.ERROR
+
+  local picker_items = {}
+  for _, d in ipairs(items) do
+    table.insert(picker_items, {
+      text     = d.message,
+      file     = d.file,
+      pos      = d.file and { d.lnum, (d.col or 1) - 1 } or nil,
+      severity = d.severity,
+    })
+  end
+
+  Snacks.picker.pick({
+    title   = 'Cargo Errors & Warnings',
+    items   = picker_items,
+    preview = 'file',
+    format  = function(item, _picker)
+      local icon = item.severity == ERROR and '● ' or '▲ '
+      local hl   = item.severity == ERROR and 'DiagnosticError' or 'DiagnosticWarn'
+      local loc  = ''
+      if item.file then
+        loc = vim.fn.fnamemodify(item.file, ':~:.') .. ':' .. (item.pos[1] or '?') .. '  '
+      end
+      return {
+        { icon, hl },
+        { loc,  'Comment' },
+        { item.text },
+      }
+    end,
+    confirm = function(picker, item)
+      picker:close()
+      if item.file then
+        vim.cmd('edit ' .. vim.fn.fnameescape(item.file))
+        if item.pos then
+          vim.api.nvim_win_set_cursor(0, { item.pos[1], item.pos[2] })
+        end
+      end
+    end,
+  })
 end
 
 return M

@@ -62,6 +62,43 @@ local function parse_line(line)
   return nil, nil
 end
 
+-- Match a "-->" source location line in both raw and tool-wrapped formats.
+-- Raw:          "   --> packages/.../lib.rs:16:5"
+-- Tool-wrapped: "  3.671s  INFO    --> packages/.../lib.rs:16:5"
+-- Returns (file, lnum, col) or nil.
+local function try_location(line)
+  local rest = line:gsub('^%s*%d+%.%d+s%s+%u+%s+', '')
+  local file, lnum, col = rest:match('^%s*%-%->%s*(.+):(%d+):(%d+)%s*$')
+  if file then return file, tonumber(lnum), tonumber(col) end
+end
+
+-- Parse output lines pairing each error/warning with its following "-->" location.
+-- Returns list of: { severity, message, output_lnum, file?, lnum?, col? }
+function M.parse_with_locations(lines)
+  local items = {}
+  local pending = nil
+  for i, line in ipairs(lines) do
+    local file, lnum, col = try_location(line)
+    if file and pending then
+      pending.file = file
+      pending.lnum = lnum
+      pending.col  = col
+      table.insert(items, pending)
+      pending = nil
+    else
+      local severity, msg = parse_line(line)
+      if severity and msg ~= '' then
+        if pending then table.insert(items, pending) end
+        pending = { severity = severity, message = msg, output_lnum = i - 1 }
+      elseif not file then
+        if pending then table.insert(items, pending); pending = nil end
+      end
+    end
+  end
+  if pending then table.insert(items, pending) end
+  return items
+end
+
 -- Parse a list of ANSI-stripped output lines from cargo / rustc / dx and
 -- return a list of diagnostic entries ready for vim.diagnostic.set().
 --

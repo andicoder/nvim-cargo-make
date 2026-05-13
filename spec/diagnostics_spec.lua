@@ -2,6 +2,11 @@ local diag  = require('cargo-make.diagnostics')
 local ERROR = vim.diagnostic.severity.ERROR
 local WARN  = vim.diagnostic.severity.WARN
 
+-- Shorthand for parse_with_locations
+local function pwl(lines)
+  return diag.parse_with_locations(lines)
+end
+
 -- Shorthand: parse a list of lines and return the first (and often only) entry.
 local function first(lines)
   return diag.parse(lines)[1]
@@ -328,6 +333,228 @@ describe('diagnostics.parse()', function()
       assert.are.equal(WARN,  r[1].severity)
       assert.are.equal(3, r[2].lnum)
       assert.are.equal(ERROR, r[2].severity)
+    end)
+
+  end)
+
+end)
+
+-- =============================================================================
+-- parse_with_locations()
+-- =============================================================================
+describe('diagnostics.parse_with_locations()', function()
+
+  -- ===========================================================================
+  -- basic pairing (GREEN)
+  -- ===========================================================================
+  describe('pairing error/warning with -->', function()
+
+    -- GREEN: plain error immediately followed by location
+    it('error + location: file/lnum/col are populated', function()
+      local r = pwl {
+        'error[E0308]: mismatched types',
+        '   --> src/main.rs:10:5',
+      }
+      assert.are.equal(1, #r)
+      assert.are.equal(ERROR,              r[1].severity)
+      assert.are.equal('mismatched types', r[1].message)
+      assert.are.equal('src/main.rs',      r[1].file)
+      assert.are.equal(10,                 r[1].lnum)
+      assert.are.equal(5,                  r[1].col)
+    end)
+
+    -- GREEN: warning immediately followed by location
+    it('warning + location: file/lnum/col are populated', function()
+      local r = pwl {
+        'warning: unused variable: `x`',
+        '   --> packages/foo/src/lib.rs:42:9',
+      }
+      assert.are.equal(1, #r)
+      assert.are.equal(WARN,                   r[1].severity)
+      assert.are.equal('packages/foo/src/lib.rs', r[1].file)
+      assert.are.equal(42,                     r[1].lnum)
+      assert.are.equal(9,                      r[1].col)
+    end)
+
+    -- GREEN: multiple errors each with their own location
+    it('two errors with locations: both paired independently', function()
+      local r = pwl {
+        'error[E0308]: mismatched types',
+        '   --> src/main.rs:10:5',
+        '',
+        'error[E0382]: borrow of moved value: `s`',
+        '   --> src/main.rs:20:9',
+      }
+      assert.are.equal(2, #r)
+      assert.are.equal('src/main.rs', r[1].file)
+      assert.are.equal(10,            r[1].lnum)
+      assert.are.equal('src/main.rs', r[2].file)
+      assert.are.equal(20,            r[2].lnum)
+    end)
+
+    -- GREEN: mixed error+warning each with locations
+    it('error then warning: severities and locations preserved', function()
+      local r = pwl {
+        'error[E0308]: mismatched types',
+        '   --> src/a.rs:5:1',
+        'warning: unused import: `std::fmt`',
+        '   --> src/b.rs:3:5',
+      }
+      assert.are.equal(2, #r)
+      assert.are.equal(ERROR,     r[1].severity)
+      assert.are.equal('src/a.rs', r[1].file)
+      assert.are.equal(WARN,      r[2].severity)
+      assert.are.equal('src/b.rs', r[2].file)
+    end)
+
+  end)
+
+  -- ===========================================================================
+  -- tool-wrapped --> lines (GREEN)
+  -- ===========================================================================
+  describe('tool-wrapped --> lines', function()
+
+    -- GREEN: dx/cargo-make timestamps the --> line just like the error line
+    it('timestamp-prefixed --> is matched and paired', function()
+      local r = pwl {
+        '   3.671s  INFO  warning: unused import: `std::error::Error`',
+        '   3.672s  INFO    --> packages/foo/src/lib.rs:16:5',
+      }
+      assert.are.equal(1, #r)
+      assert.are.equal(WARN,                   r[1].severity)
+      assert.are.equal('packages/foo/src/lib.rs', r[1].file)
+      assert.are.equal(16, r[1].lnum)
+      assert.are.equal(5,  r[1].col)
+    end)
+
+    -- GREEN: raw --> paired with tool-wrapped error
+    it('raw --> paired with tool-wrapped error', function()
+      local r = pwl {
+        '   5.234s  INFO  error[E0432]: unresolved import `Bar`',
+        '   --> src/lib.rs:1:5',
+      }
+      assert.are.equal(1, #r)
+      assert.are.equal(ERROR,      r[1].severity)
+      assert.are.equal('src/lib.rs', r[1].file)
+      assert.are.equal(1,          r[1].lnum)
+    end)
+
+  end)
+
+  -- ===========================================================================
+  -- items without a location (GREEN)
+  -- ===========================================================================
+  describe('errors/warnings with no following -->', function()
+
+    -- GREEN: error with no --> following it still emitted, file is nil
+    it('summary error with no location: item emitted with nil file', function()
+      local r = pwl { 'error: could not compile `mypkg` due to previous error' }
+      assert.are.equal(1, #r)
+      assert.are.equal(ERROR, r[1].severity)
+      assert.is_nil(r[1].file)
+      assert.is_nil(r[1].lnum)
+    end)
+
+    -- GREEN: filler line between error and --> flushes error without location;
+    -- the --> line then has no pending to attach to and is discarded.
+    it('context pipe line between error and --> flushes error with no file', function()
+      local r = pwl {
+        'error[E0308]: mismatched types',
+        '    |',                        -- non-location, non-error → flushes pending
+        '   --> src/main.rs:10:5',      -- pending is nil → dropped
+      }
+      assert.are.equal(1, #r)
+      assert.is_nil(r[1].file)
+    end)
+
+    -- GREEN: two consecutive errors — first gets no location, second gets the -->
+    it('two consecutive errors: first has no location, second has one', function()
+      local r = pwl {
+        'error[E0308]: mismatched types',
+        'error[E0382]: borrow of moved value: `s`',
+        '   --> src/main.rs:20:9',
+      }
+      assert.are.equal(2, #r)
+      assert.is_nil(r[1].file)
+      assert.are.equal('src/main.rs', r[2].file)
+      assert.are.equal(20,            r[2].lnum)
+    end)
+
+  end)
+
+  -- ===========================================================================
+  -- orphan location lines must NOT produce an item (RED intent)
+  -- ===========================================================================
+  describe('orphan location lines produce no output', function()
+
+    -- A --> line with no preceding error/warning is silently dropped.
+    it('standalone --> without preceding error: no items', function()
+      local r = pwl { '   --> src/main.rs:5:3' }
+      assert.are.same({}, r)
+    end)
+
+    it('multiple standalone --> lines: no items', function()
+      local r = pwl {
+        '   --> src/main.rs:5:3',
+        '   --> src/lib.rs:10:1',
+      }
+      assert.are.same({}, r)
+    end)
+
+  end)
+
+  -- ===========================================================================
+  -- output_lnum (GREEN)
+  -- ===========================================================================
+  describe('output_lnum', function()
+
+    -- output_lnum is the 0-based index of the error/warning line itself
+    it('output_lnum tracks the 0-based line index', function()
+      local r = pwl {
+        '',                                    -- line 1 (idx 0) – ignored
+        'error[E0308]: mismatched types',      -- line 2 (idx 1) → output_lnum = 1
+        '   --> src/main.rs:10:5',
+        '',
+        'warning: unused variable: `x`',       -- line 5 (idx 4) → output_lnum = 4
+        '   --> src/lib.rs:3:9',
+      }
+      assert.are.equal(2, #r)
+      assert.are.equal(1, r[1].output_lnum)
+      assert.are.equal(4, r[2].output_lnum)
+    end)
+
+  end)
+
+  -- ===========================================================================
+  -- edge cases (GREEN)
+  -- ===========================================================================
+  describe('edge cases', function()
+
+    it('empty input returns empty list', function()
+      assert.are.same({}, pwl({}))
+    end)
+
+    it('only location lines returns empty list', function()
+      assert.are.same({}, pwl {
+        '   --> src/main.rs:1:1',
+        '   --> src/lib.rs:5:3',
+      })
+    end)
+
+    it('only ignored filler lines returns empty list', function()
+      assert.are.same({}, pwl {
+        '    |',
+        '    = note: something',
+        '   Compiling foo v0.1.0',
+      })
+    end)
+
+    -- trailing pending: last line is an error with no --> after it
+    it('error at end of output with no --> is still emitted', function()
+      local r = pwl { 'error: aborting due to 1 previous error' }
+      assert.are.equal(1, #r)
+      assert.are.equal(ERROR, r[1].severity)
+      assert.is_nil(r[1].file)
     end)
 
   end)
