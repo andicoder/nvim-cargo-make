@@ -13,3 +13,6 @@ command! -nargs=1 -complete=customlist,cargo_make#complete CargoMakeSilent lua r
 
 " Interactive task list
 command! CargoMakeList lua require('cargo-make').list_tasks()
+
+" Snacks picker for errors and warnings from the last build
+command! CargoMakeErrors lua require('cargo-make').show_errors()

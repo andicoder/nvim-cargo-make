@@ -10,6 +10,7 @@ Execute cargo-make tasks directly from Neovim with live output streaming, intell
 - 🔄 **Smart terminal reuse** - One window for all tasks, automatically cleared between builds
 - 📜 **Adaptive scrolling** - Auto-follows output, pauses when you scroll up to investigate
 - ⌨️  **Tab completion** - Quickly find and run tasks
+- 🔍 **Error picker** - Browse all errors and warnings in a searchable list with file preview
 - 🎯 **Zero config** - Works out of the box, configure if you want
 - 🚀 **Non-blocking** - Async execution never freezes your editor
 
@@ -24,11 +25,13 @@ Execute cargo-make tasks directly from Neovim with live output streaming, intell
 - ✅ Interactive task selection with descriptions
 - ✅ Supports all cargo-make tasks and custom Makefile.toml configurations
 - ✅ Configurable output display (terminal or silent mode)
+- ✅ **Error picker** - searchable list of errors/warnings with source file preview ([snacks.nvim](https://github.com/folke/snacks.nvim) required)
 
 ## Requirements
 
 - Neovim 0.7+
 - [cargo-make](https://github.com/sagiegurari/cargo-make) installed (`cargo install cargo-make`)
+- [snacks.nvim](https://github.com/folke/snacks.nvim) (optional, required for `:CargoMakeErrors`)
 
 ## Installation
 
@@ -38,13 +41,14 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   'andicoder/nvim-cargo-make',
   ft = 'rust',
-  cmd = { 'CargoMake', 'CargoMakeList' },
+  cmd = { 'CargoMake', 'CargoMakeList', 'CargoMakeErrors' },
   keys = {
-    { '<leader>mc', ':CargoMake check<CR>', desc = 'Cargo Make: Check' },
-    { '<leader>mb', ':CargoMake build<CR>', desc = 'Cargo Make: Build' },
-    { '<leader>mt', ':CargoMake test<CR>', desc = 'Cargo Make: Test' },
-    { '<leader>mr', ':CargoMake run<CR>', desc = 'Cargo Make: Run' },
-    { '<leader>ml', ':CargoMakeList<CR>', desc = 'Cargo Make: List Tasks' },
+    { '<leader>mc', ':CargoMake check<CR>',   desc = 'Cargo Make: Check' },
+    { '<leader>mb', ':CargoMake build<CR>',   desc = 'Cargo Make: Build' },
+    { '<leader>mt', ':CargoMake test<CR>',    desc = 'Cargo Make: Test' },
+    { '<leader>mr', ':CargoMake run<CR>',     desc = 'Cargo Make: Run' },
+    { '<leader>ml', ':CargoMakeList<CR>',     desc = 'Cargo Make: List Tasks' },
+    { '<leader>me', ':CargoMakeErrors<CR>',   desc = 'Cargo Make: Error Picker' },
   },
 }
 ```
@@ -78,6 +82,12 @@ Plug 'andicoder/nvim-cargo-make'
   - Shows all available tasks with descriptions
   - Select a task to run
 
+- `:CargoMakeErrors` - Open a searchable picker of all errors and warnings from the last build
+  - Shows `●` for errors and `▲` for warnings with filename and line number
+  - Preview pane shows the source file at the exact error location
+  - Press `Enter` to jump directly to the error in your editor
+  - Requires [snacks.nvim](https://github.com/folke/snacks.nvim)
+
 ### Terminal Navigation
 
 In the terminal output window:
@@ -86,6 +96,7 @@ In the terminal output window:
 - Scroll up to read earlier output (auto-scroll pauses)
 - Scroll back to bottom to resume auto-scroll
 - Press `q` or `<Esc>` to close the terminal window
+- Press `e` to open the error picker
 
 ### Example Workflows
 
@@ -119,6 +130,15 @@ In the terminal output window:
 " Select a task and press Enter to run it
 ```
 
+**Browse errors after a failed build:**
+```vim
+:CargoMake build         " Build fails — output pane shows errors
+:CargoMakeErrors         " Opens error picker (or press 'e' in the output pane)
+" ● error[E0308]: mismatched types  src/main.rs:10
+" ▲ warning: unused variable: `x`  src/lib.rs:42
+" Fuzzy-search by message text, preview the file, Enter to jump
+```
+
 **Using tab completion:**
 ```vim
 :CargoMake <Tab>         " Shows all available task names
@@ -150,7 +170,8 @@ vim.keymap.set('n', '<leader>mb', ':CargoMake build<CR>', { desc = 'Cargo Make: 
 vim.keymap.set('n', '<leader>mt', ':CargoMake test<CR>', { desc = 'Cargo Make: Test' })
 vim.keymap.set('n', '<leader>mr', ':CargoMake run<CR>', { desc = 'Cargo Make: Run' })
 vim.keymap.set('n', '<leader>mf', ':CargoMake fmt<CR>', { desc = 'Cargo Make: Format' })
-vim.keymap.set('n', '<leader>ml', ':CargoMakeList<CR>', { desc = 'Cargo Make: List tasks' })
+vim.keymap.set('n', '<leader>ml', ':CargoMakeList<CR>',   { desc = 'Cargo Make: List tasks' })
+vim.keymap.set('n', '<leader>me', ':CargoMakeErrors<CR>', { desc = 'Cargo Make: Error picker' })
 
 -- Window navigation
 vim.keymap.set('n', '<C-w>w', '<C-w>w', { desc = 'Switch to next window' })
