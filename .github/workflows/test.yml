@@ -1,0 +1,30 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: spec suite (Neovim stable)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
+
+      - name: Install plenary.nvim
+        run: |
+          plenary_dir="$HOME/.local/share/nvim/lazy/plenary.nvim"
+          mkdir -p "$(dirname "$plenary_dir")"
+          git clone --depth=1 https://github.com/nvim-lua/plenary.nvim "$plenary_dir"
+
+      - name: Run tests
+        run: make test
