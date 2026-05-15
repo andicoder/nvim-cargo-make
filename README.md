@@ -43,7 +43,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   'andicoder/nvim-cargo-make',
   ft = 'rust',
-  cmd = { 'CargoMake', 'CargoMakeList', 'CargoMakeErrors' },
+  cmd = { 'CargoMake', 'CargoMakeSilent', 'CargoMakeList', 'CargoMakeErrors' },
   keys = {
     { '<leader>mc', ':CargoMake check<CR>',   desc = 'Cargo Make: Check' },
     { '<leader>mb', ':CargoMake build<CR>',   desc = 'Cargo Make: Build' },
@@ -114,7 +114,7 @@ In the terminal output window:
 " Terminal is automatically cleared before each build
 
 " Navigate in the terminal:
-" j/k - scroll up/down
+" j/k - scroll down/up
 " gg/G - jump to top/bottom
 " /pattern - search for text
 " q or <Esc> - close terminal
