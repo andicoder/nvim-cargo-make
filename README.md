@@ -1,5 +1,7 @@
 # nvim-cargo-make
 
+[![test](https://github.com/andicoder/nvim-cargo-make/actions/workflows/test.yml/badge.svg)](https://github.com/andicoder/nvim-cargo-make/actions/workflows/test.yml)
+
 > A lightweight Neovim plugin for seamless [cargo-make](https://github.com/sagiegurari/cargo-make) integration with real-time terminal output and smart window management.
 
 Execute cargo-make tasks directly from Neovim with live output streaming, intelligent terminal reuse, and adaptive auto-scrolling. Built for Rust developers who want their build tools to stay out of the way.
