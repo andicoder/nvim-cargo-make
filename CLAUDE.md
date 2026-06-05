@@ -2,16 +2,16 @@
 
 This file is loaded automatically by Claude Code when working in this repo. It complements the user-level global CLAUDE.md; use both.
 
+
 ## Discipline
 
-- **TDD.** Red → green → refactor. Add or change a failing test BEFORE adding production code. The exception is purely mechanical edits (rename, typo, formatting) and exploratory spikes that get reverted.
-- **Clean-code.** Small functions, intention-revealing names, single responsibility. If a function reads top-down, no helpers needed; reach for extraction when the same chunk recurs or the body grows past the soft limit below.
+TDD scope: all Lua modules under `spec/`. Clean-code applies (see global CLAUDE.md).
+
 - **Code size limits — soft targets, applied by judgement (no linter wired in yet).**
   - **Line length: ~100.** PEP 8's 79 is too tight; >120 makes side-by-side diffs unreadable.
   - **Function body: ~25 LOC.** Extract a helper when the body grows past that or when the same chunk recurs.
   - **Function arguments: max 5.** Bundle related collaborators into a table (`opts`, `config`) and pass the bundle as a single param. The plugin already does this for `M.run_task(task_name, opts)` and `terminal.run(task_name, cmd, root, config, on_exit)`.
-- **Comments — light, at critical spots.** Trivial WHAT-comments (`-- set the buffer`) and multi-paragraph docblocks stay forbidden. But brief comments are encouraged where the WHY is genuinely non-obvious from the code: Neovim API quirks, terminal buffer lifecycle, ANSI stripping, parser pairing logic, async job teardown. One short line is usually enough; two if needed. If a clearer name would remove the need for the comment, prefer the name.
-- **PRs, commits and issues are English.** Even when the conversation is in another language, issue titles, issue bodies, PR titles, PR bodies, commit subjects and commit bodies are written in English.
+- **Comments — light, at critical spots.** Trivial WHAT-comments and multi-paragraph docblocks stay forbidden. Brief comments are encouraged where the WHY is non-obvious: Neovim API quirks, terminal buffer lifecycle, ANSI stripping, parser pairing logic, async job teardown. One short line is usually enough.
 
 ## Stack
 
@@ -40,10 +40,7 @@ nvim path/to/rust/project/src/main.rs
 
 ## Issue / PR workflow
 
-- One issue → one branch → one PR. Do not bundle multiple GitHub issues into one branch, even when the diffs would be small. Each PR references the issue it closes in the body (`Fixes #N`).
-- Branch names: `fix/<slug>`, `feat/<slug>`, `chore/<slug>`, `docs/<slug>`. Slug is short, kebab-case, and reflects the change, not the ticket number.
-- The test that proves the fix and the fix itself land in the same PR (TDD: red → green in the same branch, not split across PRs).
-- Branch from `main`. Do not chain issue branches; rebase on `main` if it moves while the PR is open.
+Standard flow from global CLAUDE.md applies. TDD addition: the failing test and the fix land in the same PR — never split across PRs.
 
 ## Conventions specific to this codebase
 
